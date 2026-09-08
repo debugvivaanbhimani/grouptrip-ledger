@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { closeoutNet, deriveShare, forecastCost, fundingProgress, minimiseSettlement, poolBalance, routeRefund } from "../lib/ledger";
+import { closeoutNet, deriveShare, forecastCost, fundingProgress, minimiseSettlement, netByCurrency, poolBalance, recordCurrencyExpense, routeRefund } from "../lib/ledger";
 
 describe("GroupTrip Ledger deterministic math", () => {
   it("derives a booking share from participation count", () => {
@@ -51,4 +51,15 @@ it("tracks escrow funding and close-out totals deterministically", () => {
     { name: "Priya", amount: 0 },
   ], 18000)).toEqual({ required: 54000, collected: 36000, remaining: 18000, complete: false });
   expect(closeoutNet(12000, 18000, 4500)).toBe(34500);
+});
+
+it("preserves original currency and records FX costs separately", () => {
+  expect(recordCurrencyExpense({ originalAmount: 180, currency: "USD", fxRate: 83.12, fxSpread: 120, foreignFee: 75 })).toEqual({
+    originalAmount: 180, currency: "USD", fxRate: 83.12, fxSpread: 120, foreignFee: 75, baseAmount: 14961.6, totalBaseCost: 15156.6,
+  });
+  expect(netByCurrency([
+    { originalAmount: 180, currency: "USD", fxRate: 83.12, fxSpread: 120, foreignFee: 75 },
+    { originalAmount: 50, currency: "USD", fxRate: 83.2, fxSpread: 0, foreignFee: 0 },
+    { originalAmount: 2200, currency: "INR", fxRate: 1, fxSpread: 0, foreignFee: 0 },
+  ])).toEqual({ USD: 230, INR: 2200 });
 });

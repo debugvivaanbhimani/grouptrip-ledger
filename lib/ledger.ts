@@ -54,3 +54,20 @@ export function fundingProgress(contributions: Balance[], requiredPerMember: num
 export function closeoutNet(poolBalanceAmount: number, refunds: number, leftover: number) {
   return Math.round((poolBalanceAmount + refunds + leftover) * 100) / 100;
 }
+
+export type CurrencyExpense = { originalAmount: number; currency: string; fxRate: number; fxSpread: number; foreignFee: number };
+
+export function recordCurrencyExpense(expense: CurrencyExpense) {
+  return {
+    ...expense,
+    baseAmount: Math.round(expense.originalAmount * expense.fxRate * 100) / 100,
+    totalBaseCost: Math.round((expense.originalAmount * expense.fxRate + expense.fxSpread + expense.foreignFee) * 100) / 100,
+  };
+}
+
+export function netByCurrency(expenses: CurrencyExpense[]) {
+  return expenses.reduce<Record<string, number>>((totals, expense) => {
+    totals[expense.currency] = Math.round(((totals[expense.currency] ?? 0) + expense.originalAmount) * 100) / 100;
+    return totals;
+  }, {});
+}
