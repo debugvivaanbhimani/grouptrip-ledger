@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { deriveShare, forecastCost, minimiseSettlement, routeRefund } from "../lib/ledger";
+import { closeoutNet, deriveShare, forecastCost, fundingProgress, minimiseSettlement, poolBalance, routeRefund } from "../lib/ledger";
 
 describe("GroupTrip Ledger deterministic math", () => {
   it("derives a booking share from participation count", () => {
@@ -41,4 +41,14 @@ it("forecasts a person's cost from draft opt-ins", () => {
     { category: "Stay", amount: 24000, participantCount: 4 },
     { category: "Activity", amount: 8000, participantCount: 3 },
   ], [true, false])).toBe(6000);
+});
+
+it("tracks escrow funding and close-out totals deterministically", () => {
+  expect(poolBalance(36000, 24000)).toEqual({ collected: 36000, committed: 24000, available: 12000 });
+  expect(fundingProgress([
+    { name: "Aisha", amount: 18000 },
+    { name: "Rohan", amount: 18000 },
+    { name: "Priya", amount: 0 },
+  ], 18000)).toEqual({ required: 54000, collected: 36000, remaining: 18000, complete: false });
+  expect(closeoutNet(12000, 18000, 4500)).toBe(34500);
 });

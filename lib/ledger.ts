@@ -40,3 +40,17 @@ export type ForecastLine = { category: string; amount: number; participantCount:
 export function forecastCost(lines: ForecastLine[], personParticipates: boolean[] = lines.map(() => true)) {
   return Math.round(lines.reduce((sum, line, index) => sum + (personParticipates[index] ? line.amount / Math.max(1, line.participantCount) : 0), 0) * 100) / 100;
 }
+
+export function poolBalance(collected: number, committed: number) {
+  return { collected, committed, available: Math.round((collected - committed) * 100) / 100 };
+}
+
+export function fundingProgress(contributions: Balance[], requiredPerMember: number) {
+  const required = contributions.length * requiredPerMember;
+  const collected = contributions.reduce((sum, member) => sum + member.amount, 0);
+  return { required, collected, remaining: Math.max(0, required - collected), complete: collected >= required };
+}
+
+export function closeoutNet(poolBalanceAmount: number, refunds: number, leftover: number) {
+  return Math.round((poolBalanceAmount + refunds + leftover) * 100) / 100;
+}

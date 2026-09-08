@@ -17,7 +17,7 @@ import {
 
 import { ScreenContainer } from "@/components/screen-container";
 
-type Tab = "plan" | "overview" | "ledger" | "settle" | "activity" | "profile";
+type Tab = "plan" | "pool" | "overview" | "ledger" | "settle" | "activity" | "profile";
 type Booking = {
   id: string;
   title: string;
@@ -127,7 +127,10 @@ export default function HomeScreen() {
   const [newCategory, setNewCategory] = useState("Other");
   const [newParticipants, setNewParticipants] = useState<string[]>(["Aisha", "Rohan"]);
   const [draftOptIns, setDraftOptIns] = useState({ rafting: true, spiceMarket: true, waterfall: false });
-  const [poolSettled, setPoolSettled] = useState(true);
+  const [poolContributions, setPoolContributions] = useState<Record<string, number>>({ Aisha: 18000, Rohan: 18000, Priya: 0, Neha: 0 });
+  const [payoutReleased, setPayoutReleased] = useState(false);
+  const [escrowClosed, setEscrowClosed] = useState(false);
+  const tripVpa = "monsoon.escape@gtpool";
 
   const total = useMemo(() => bookings.reduce((sum, booking) => sum + booking.amount, 0), [bookings]);
   const yourShare = useMemo(
@@ -205,6 +208,40 @@ export default function HomeScreen() {
         <SectionHeader title="Forecast vs. budget" />
         <View style={styles.forecastCard}><View style={styles.forecastRow}><Avatar name="Aisha" small /><View style={{ flex: 1 }}><Text style={styles.forecastName}>Aisha · you</Text><Text style={styles.forecastMeta}>Forecast {money(projected)} of {money(23500)}</Text></View><Text style={styles.onTrack}>ON TRACK</Text></View><View style={styles.forecastBar}><View style={[styles.forecastFill, { width: `${Math.min(100, (projected / 23500) * 100)}%` }]} /></View><View style={styles.forecastRow}><Avatar name="Rohan" small /><View style={{ flex: 1 }}><Text style={styles.forecastName}>Rohan</Text><Text style={styles.forecastMeta}>Forecast ₹19,200 of ₹18,000</Text></View><Text style={styles.overBudget}>OVER BY ₹1,200</Text></View><View style={styles.forecastBar}><View style={[styles.forecastFill, styles.forecastOver, { width: "100%" }]} /></View></View>
         <View style={styles.poolContributionCard}><View style={styles.poolContributionIcon}><Icon name="account-balance" size={18} color={colors.blue} /></View><View style={{ flex: 1 }}><Text style={styles.poolContributionTitle}>Required pool contribution</Text><Text style={styles.poolContributionText}>Fund {money(projected)} when the group confirms. The amount follows the forecast, not a guess.</Text></View><Icon name="arrow-forward" size={17} color={colors.blue} /></View>
+      </>
+    );
+  }
+
+  function renderPool() {
+    const requiredPerMember = 18000;
+    const membersForPool = ["Aisha", "Rohan", "Priya", "Neha"];
+    const requiredTotal = requiredPerMember * membersForPool.length;
+    const collected = Object.values(poolContributions).reduce((sum, amount) => sum + amount, 0);
+    const committed = 24000;
+    const available = collected - committed;
+    const pendingMembers = membersForPool.filter((member) => poolContributions[member] < requiredPerMember);
+    const confirmContribution = (member: string) => {
+      Alert.alert("UPI payment opened", `Pay ${money(requiredPerMember - (poolContributions[member] ?? 0))} to ${tripVpa}. A mocked webhook will confirm arrival automatically.`);
+      setTimeout(() => {
+        setPoolContributions((current) => ({ ...current, [member]: requiredPerMember }));
+        Alert.alert("Contribution received", `${member}'s trip-pool contribution was confirmed by webhook and added to the ledger.`);
+      }, 450);
+    };
+    return (
+      <>
+        <View style={styles.poolHero}>
+          <View style={styles.poolHeroTop}><View><Text style={styles.eyebrowLight}>TRIP ESCROW · MOCK ACCOUNT</Text><Text style={styles.poolHeroTitle}>Monsoon Escape pool</Text><Text style={styles.poolHeroSubtitle}>Funds stay with the licensed payment partner until the group approves a release.</Text></View><View style={styles.poolHeroIcon}><Icon name="account-balance" size={24} color="#FFFFFF" /></View></View>
+          <View style={styles.vpaCard}><View><Text style={styles.vpaLabel}>TRIP ACCOUNT / UPI VPA</Text><Text style={styles.vpaValue}>{tripVpa}</Text></View><Pressable onPress={() => Alert.alert("VPA copied", tripVpa)} style={styles.copyButton}><Icon name="content-copy" size={15} color={colors.blue} /><Text style={styles.copyButtonText}>Copy</Text></Pressable></View>
+        </View>
+        <SectionHeader title="Live pool balance" action="Refresh" onAction={() => Alert.alert("Pool synced", "Latest payment-partner balance and webhook events are up to date.")} />
+        <View style={styles.poolBalanceCard}><View style={styles.poolBalanceRow}><View><Text style={styles.poolBalanceLabel}>COLLECTED</Text><Text style={styles.poolBalanceValue}>{money(collected)}</Text></View><View><Text style={styles.poolBalanceLabel}>COMMITTED</Text><Text style={styles.poolBalanceValue}>{money(committed)}</Text></View><View><Text style={styles.poolBalanceLabel}>AVAILABLE</Text><Text style={[styles.poolBalanceValue, { color: colors.mintText }]}>{money(available)}</Text></View></View><View style={styles.poolProgressTrack}><View style={[styles.poolProgressFill, { width: `${Math.min(100, (collected / requiredTotal) * 100)}%` }]} /></View><Text style={styles.poolProgressText}>{money(collected)} of {money(requiredTotal)} collected{pendingMembers.length ? ` · waiting on ${pendingMembers.join(" and ")}` : " · fully funded"}</Text></View>
+        <SectionHeader title="Member contributions" />
+        <View style={styles.contributionCard}>{membersForPool.map((member) => { const amount = poolContributions[member] ?? 0; const funded = amount >= requiredPerMember; return <View key={member} style={styles.contributionRow}><Avatar name={member} small /><View style={{ flex: 1 }}><Text style={styles.contributionName}>{member}{member === "Aisha" ? " · you" : ""}</Text><Text style={styles.contributionMeta}>{money(amount)} of {money(requiredPerMember)} collected</Text></View>{funded ? <View style={styles.webhookBadge}><Icon name="check" size={12} color={colors.mintText} /><Text style={styles.webhookBadgeText}>Webhook confirmed</Text></View> : <Pressable onPress={() => confirmContribution(member)} style={({ pressed }) => [styles.poolAction, pressed && styles.pressed]}><Text style={styles.poolActionText}>Add to trip pool</Text></Pressable>}</View>})}</View>
+        <View style={styles.webhookNote}><Icon name="sync" size={17} color={colors.blue} /><View style={{ flex: 1 }}><Text style={styles.webhookTitle}>Automatic ledger update</Text><Text style={styles.webhookText}>Payment-partner webhooks confirm arrivals. No one manually marks a contribution as paid.</Text></View></View>
+        <SectionHeader title="Vendor payout queue" />
+        <View style={styles.payoutCard}><View style={styles.payoutHeader}><View style={styles.payoutIcon}><Icon name="hotel" size={20} color={colors.blue} /></View><View style={{ flex: 1 }}><Text style={styles.payoutTitle}>Hotel · The Fern Residency</Text><Text style={styles.payoutMeta}>{money(24000)} · funding condition met</Text></View>{payoutReleased ? <View style={styles.paidBadge}><Text style={styles.paidBadgeText}>PAID</Text></View> : <View style={styles.readyBadge}><Text style={styles.readyBadgeText}>READY</Text></View>}</View>{payoutReleased ? <View style={styles.paidState}><Icon name="check-circle" size={18} color={colors.mintText} /><Text style={styles.paidStateText}>Paid to vendor · today at 10:48 AM</Text></View> : <><View style={styles.holdBanner}><Icon name="schedule" size={18} color={colors.peachText} /><View style={{ flex: 1 }}><Text style={styles.holdTitle}>Confirmation hold · 00:18:42</Text><Text style={styles.holdText}>Review the vendor and amount before releasing funds.</Text></View></View><View style={styles.payoutActions}><Pressable onPress={() => Alert.alert("Payout held", "The booking remains in the queue. No funds were released.")} style={({ pressed }) => [styles.holdButton, pressed && styles.pressed]}><Icon name="pause" size={15} color={colors.muted} /><Text style={styles.holdButtonText}>Hold</Text></Pressable><Pressable onPress={() => { setPayoutReleased(true); Alert.alert("Payout released", "The vendor payment is now marked paid to vendor."); }} style={({ pressed }) => [styles.releaseButton, pressed && styles.pressed]}><Icon name="lock-open" size={15} color="#FFFFFF" /><Text style={styles.releaseButtonText}>Release payout</Text></Pressable></View></>}</View>
+        <SectionHeader title="Trip close-out" />
+        <View style={styles.closeoutCard}>{escrowClosed ? <><View style={styles.closedRow}><Icon name="check-circle" size={20} color={colors.mintText} /><Text style={styles.closedTitle}>Escrow closed successfully</Text></View><Text style={styles.closeoutText}>Balances were netted, refunds and leftover pool balance were paid out, and personal statements are ready.</Text><View style={styles.statementPill}><Icon name="description" size={15} color={colors.blue} /><Text style={styles.statementText}>Aisha · settlement statement generated</Text></View></> : <><Text style={styles.closeoutTitle}>Ready when the trip is complete</Text><Text style={styles.closeoutText}>Net all member balances, route refunds and leftover funds back to their sources, then close this escrow instance.</Text><Pressable onPress={() => { setEscrowClosed(true); Alert.alert("Trip closed", "Personal settlement statements were generated for every member."); }} style={({ pressed }) => [styles.closeoutButton, pressed && styles.pressed]}><Icon name="lock" size={16} color="#FFFFFF" /><Text style={styles.closeoutButtonText}>Close escrow & generate statements</Text></Pressable></>}</View>
       </>
     );
   }
@@ -385,13 +422,13 @@ export default function HomeScreen() {
     <ScreenContainer edges={["top", "left", "right", "bottom"]} containerClassName="bg-[#F5F8FC]">
       <StatusBar barStyle="dark-content" />
       <View style={styles.appShell}>
-        <View style={styles.topBar}><View><Text style={styles.greeting}>Good morning, Aisha</Text><Text style={styles.topSubtitle}>{activeTab === "plan" ? "Set the budget before the bookings" : activeTab === "overview" ? "Here’s what’s moving in your trip" : activeTab === "ledger" ? "Every booking, one source of truth" : activeTab === "settle" ? "Close the loop with fewer transfers" : activeTab === "activity" ? "Trace every change with confidence" : "Your account and trip controls"}</Text></View><Pressable onPress={() => setActiveTab("profile")} style={({ pressed }) => [styles.topAvatar, pressed && styles.pressed]}><Text style={styles.topAvatarText}>AK</Text></Pressable></View>
+        <View style={styles.topBar}><View><Text style={styles.greeting}>Good morning, Aisha</Text><Text style={styles.topSubtitle}>{activeTab === "plan" ? "Set the budget before the bookings" : activeTab === "pool" ? "Fund safely, release deliberately" : activeTab === "overview" ? "Here’s what’s moving in your trip" : activeTab === "ledger" ? "Every booking, one source of truth" : activeTab === "settle" ? "Close the loop with fewer transfers" : activeTab === "activity" ? "Trace every change with confidence" : "Your account and trip controls"}</Text></View><Pressable onPress={() => setActiveTab("profile")} style={({ pressed }) => [styles.topAvatar, pressed && styles.pressed]}><Text style={styles.topAvatarText}>AK</Text></Pressable></View>
         <View style={styles.tripSwitcher}><View style={styles.tripSwitcherLeft}><View style={styles.tripDot}><Icon name="flight-takeoff" size={16} color="#FFFFFF" /></View><View><Text style={styles.tripSwitcherLabel}>CURRENT TRIP</Text><Text style={styles.tripSwitcherTitle}>Monsoon Escape</Text></View></View><Icon name="keyboard-arrow-down" size={20} color={colors.muted} /></View>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-          {activeTab === "plan" ? renderPlan() : activeTab === "overview" ? renderOverview() : activeTab === "ledger" ? renderLedger() : activeTab === "settle" ? renderSettle() : activeTab === "activity" ? renderActivity() : renderProfile()}
+          {activeTab === "plan" ? renderPlan() : activeTab === "pool" ? renderPool() : activeTab === "overview" ? renderOverview() : activeTab === "ledger" ? renderLedger() : activeTab === "settle" ? renderSettle() : activeTab === "activity" ? renderActivity() : renderProfile()}
           <View style={{ height: 96 }} />
         </ScrollView>
-        <View style={styles.bottomNav}>{(["plan", "overview", "ledger", "settle", "activity", "profile"] as Tab[]).map((tab) => { const meta = { plan: ["route", "Plan"], overview: ["home", "Home"], ledger: ["account-balance-wallet", "Ledger"], settle: ["payments", "Settle"], activity: ["timeline", "Activity"], profile: ["person-outline", "Profile"] }[tab] as [keyof typeof MaterialIcons.glyphMap, string]; return <Pressable key={tab} onPress={() => setActiveTab(tab)} style={({ pressed }) => [styles.navItem, pressed && styles.pressed]}><Icon name={meta[0]} size={22} color={activeTab === tab ? colors.blue : colors.faint} /><Text style={[styles.navLabel, activeTab === tab && styles.navLabelActive]}>{meta[1]}</Text>{activeTab === tab ? <View style={styles.navIndicator} /> : null}</Pressable>; })}</View>
+        <View style={styles.bottomNav}>{(["plan", "pool", "overview", "ledger", "settle", "activity", "profile"] as Tab[]).map((tab) => { const meta = { plan: ["route", "Plan"], pool: ["account-balance", "Pool"], overview: ["home", "Home"], ledger: ["account-balance-wallet", "Ledger"], settle: ["payments", "Settle"], activity: ["timeline", "Activity"], profile: ["person-outline", "Profile"] }[tab] as [keyof typeof MaterialIcons.glyphMap, string]; return <Pressable key={tab} onPress={() => setActiveTab(tab)} style={({ pressed }) => [styles.navItem, pressed && styles.pressed]}><Icon name={meta[0]} size={22} color={activeTab === tab ? colors.blue : colors.faint} /><Text style={[styles.navLabel, activeTab === tab && styles.navLabelActive]}>{meta[1]}</Text>{activeTab === tab ? <View style={styles.navIndicator} /> : null}</Pressable>; })}</View>
       </View>
 
       <Modal visible={addOpen} animationType="slide" transparent onRequestClose={() => setAddOpen(false)}>
@@ -564,6 +601,62 @@ const styles = StyleSheet.create({
   roadmapPillText: { color: colors.ink, fontSize: 10, fontWeight: "700" },
   futureLabel: { color: colors.faint, fontSize: 8, fontWeight: "800", letterSpacing: 0.8, marginTop: 5 },
   version: { color: colors.faint, fontSize: 9, textAlign: "center", letterSpacing: 1, marginTop: 28 },
+  poolHero: { backgroundColor: colors.ink, borderRadius: 20, padding: 18, marginBottom: 18, shadowColor: colors.ink, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 15, elevation: 6 },
+  poolHeroTop: { flexDirection: "row", justifyContent: "space-between", gap: 10 },
+  poolHeroTitle: { color: "#FFFFFF", fontSize: 23, fontWeight: "800", letterSpacing: -0.5, marginTop: 8 },
+  poolHeroSubtitle: { color: "#B6C6DA", fontSize: 10, lineHeight: 15, marginTop: 5, maxWidth: 280 },
+  poolHeroIcon: { width: 45, height: 45, borderRadius: 14, backgroundColor: "#27456D", alignItems: "center", justifyContent: "center" },
+  vpaCard: { backgroundColor: "#FFFFFF", borderRadius: 12, padding: 11, marginTop: 16, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  vpaLabel: { color: colors.faint, fontSize: 8, fontWeight: "800", letterSpacing: 0.8 },
+  vpaValue: { color: colors.ink, fontSize: 12, fontWeight: "800", marginTop: 4 },
+  copyButton: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 8, paddingVertical: 6, backgroundColor: colors.blueSoft, borderRadius: 8 },
+  copyButtonText: { color: colors.blue, fontSize: 10, fontWeight: "800" },
+  poolBalanceCard: { backgroundColor: colors.card, borderRadius: 16, borderWidth: 1, borderColor: colors.line, padding: 14, marginBottom: 22 },
+  poolBalanceRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 14 },
+  poolBalanceLabel: { color: colors.faint, fontSize: 8, fontWeight: "800", letterSpacing: 0.7 },
+  poolBalanceValue: { color: colors.ink, fontSize: 18, fontWeight: "800", marginTop: 5 },
+  poolProgressTrack: { height: 8, borderRadius: 4, backgroundColor: colors.bg, overflow: "hidden" },
+  poolProgressFill: { height: 8, borderRadius: 4, backgroundColor: colors.blue },
+  poolProgressText: { color: colors.muted, fontSize: 10, marginTop: 8 },
+  contributionCard: { backgroundColor: colors.card, borderRadius: 16, borderWidth: 1, borderColor: colors.line, paddingHorizontal: 13, marginBottom: 12 },
+  contributionRow: { flexDirection: "row", alignItems: "center", gap: 9, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.line },
+  contributionName: { color: colors.ink, fontSize: 11, fontWeight: "800" },
+  contributionMeta: { color: colors.muted, fontSize: 9, marginTop: 3 },
+  webhookBadge: { backgroundColor: colors.mint, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 6, flexDirection: "row", alignItems: "center", gap: 4 },
+  webhookBadgeText: { color: colors.mintText, fontSize: 8, fontWeight: "800" },
+  poolAction: { backgroundColor: colors.blueSoft, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 7 },
+  poolActionText: { color: colors.blue, fontSize: 9, fontWeight: "800" },
+  webhookNote: { backgroundColor: colors.blueSoft, borderRadius: 14, padding: 13, flexDirection: "row", alignItems: "flex-start", gap: 9, marginBottom: 22 },
+  webhookTitle: { color: colors.ink, fontSize: 11, fontWeight: "800" },
+  webhookText: { color: colors.muted, fontSize: 10, lineHeight: 14, marginTop: 3 },
+  payoutCard: { backgroundColor: colors.card, borderRadius: 16, borderWidth: 1, borderColor: colors.line, padding: 14, marginBottom: 22 },
+  payoutHeader: { flexDirection: "row", alignItems: "center", gap: 9 },
+  payoutIcon: { width: 39, height: 39, borderRadius: 12, backgroundColor: colors.blueSoft, alignItems: "center", justifyContent: "center" },
+  payoutTitle: { color: colors.ink, fontSize: 11, fontWeight: "800" },
+  payoutMeta: { color: colors.muted, fontSize: 9, marginTop: 4 },
+  readyBadge: { backgroundColor: colors.peach, borderRadius: 7, paddingHorizontal: 7, paddingVertical: 5 },
+  readyBadgeText: { color: colors.peachText, fontSize: 8, fontWeight: "800" },
+  paidBadge: { backgroundColor: colors.mint, borderRadius: 7, paddingHorizontal: 7, paddingVertical: 5 },
+  paidBadgeText: { color: colors.mintText, fontSize: 8, fontWeight: "800" },
+  holdBanner: { backgroundColor: colors.peach, borderRadius: 11, padding: 11, flexDirection: "row", gap: 8, alignItems: "center", marginTop: 13 },
+  holdTitle: { color: colors.ink, fontSize: 10, fontWeight: "800" },
+  holdText: { color: colors.muted, fontSize: 9, marginTop: 3 },
+  payoutActions: { flexDirection: "row", gap: 8, marginTop: 10 },
+  holdButton: { flex: 1, height: 38, borderRadius: 10, borderWidth: 1, borderColor: colors.line, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 5 },
+  holdButtonText: { color: colors.muted, fontSize: 10, fontWeight: "800" },
+  releaseButton: { flex: 1.5, height: 38, borderRadius: 10, backgroundColor: colors.blue, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 5 },
+  releaseButtonText: { color: "#FFFFFF", fontSize: 10, fontWeight: "800" },
+  paidState: { backgroundColor: colors.mint, borderRadius: 11, padding: 11, flexDirection: "row", alignItems: "center", gap: 7, marginTop: 13 },
+  paidStateText: { color: colors.mintText, fontSize: 10, fontWeight: "800" },
+  closeoutCard: { backgroundColor: colors.card, borderRadius: 16, borderWidth: 1, borderColor: colors.line, padding: 14 },
+  closeoutTitle: { color: colors.ink, fontSize: 12, fontWeight: "800" },
+  closeoutText: { color: colors.muted, fontSize: 10, lineHeight: 15, marginTop: 6 },
+  closeoutButton: { height: 40, borderRadius: 11, backgroundColor: colors.ink, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 6, marginTop: 13 },
+  closeoutButtonText: { color: "#FFFFFF", fontSize: 10, fontWeight: "800" },
+  closedRow: { flexDirection: "row", alignItems: "center", gap: 7 },
+  closedTitle: { color: colors.ink, fontSize: 12, fontWeight: "800" },
+  statementPill: { backgroundColor: colors.blueSoft, borderRadius: 9, padding: 9, flexDirection: "row", alignItems: "center", gap: 6, marginTop: 11 },
+  statementText: { color: colors.blue, fontSize: 9, fontWeight: "800" },
   planHero: { backgroundColor: colors.ink, borderRadius: 20, padding: 18, marginBottom: 22, shadowColor: colors.ink, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 15, elevation: 6 },
   planHeroTop: { flexDirection: "row", justifyContent: "space-between", gap: 10 },
   planHeroTitle: { color: "#FFFFFF", fontSize: 24, fontWeight: "800", letterSpacing: -0.6, marginTop: 8 },
