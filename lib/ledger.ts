@@ -33,3 +33,10 @@ export function minimiseSettlement(debts: Balance[], credits: Balance[]) {
   }
   return transfers;
 }
+
+export type ForecastLine = { category: string; amount: number; participantCount: number };
+
+/** Computes a person's projected cost from draft items and opt-in participation. */
+export function forecastCost(lines: ForecastLine[], personParticipates: boolean[] = lines.map(() => true)) {
+  return Math.round(lines.reduce((sum, line, index) => sum + (personParticipates[index] ? line.amount / Math.max(1, line.participantCount) : 0), 0) * 100) / 100;
+}

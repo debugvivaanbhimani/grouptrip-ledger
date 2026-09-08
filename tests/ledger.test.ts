@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { deriveShare, minimiseSettlement, routeRefund } from "../lib/ledger";
+import { deriveShare, forecastCost, minimiseSettlement, routeRefund } from "../lib/ledger";
 
 describe("GroupTrip Ledger deterministic math", () => {
   it("derives a booking share from participation count", () => {
@@ -29,4 +29,16 @@ describe("GroupTrip Ledger deterministic math", () => {
       { from: "Neha", to: "Rohan", amount: 500 },
     ]);
   });
+});
+
+
+it("forecasts a person's cost from draft opt-ins", () => {
+  expect(forecastCost([
+    { category: "Stay", amount: 24000, participantCount: 4 },
+    { category: "Activity", amount: 8000, participantCount: 3 },
+  ])).toBe(8666.67);
+  expect(forecastCost([
+    { category: "Stay", amount: 24000, participantCount: 4 },
+    { category: "Activity", amount: 8000, participantCount: 3 },
+  ], [true, false])).toBe(6000);
 });

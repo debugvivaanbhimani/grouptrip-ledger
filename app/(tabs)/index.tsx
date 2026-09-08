@@ -17,7 +17,7 @@ import {
 
 import { ScreenContainer } from "@/components/screen-container";
 
-type Tab = "overview" | "ledger" | "settle" | "activity" | "profile";
+type Tab = "plan" | "overview" | "ledger" | "settle" | "activity" | "profile";
 type Booking = {
   id: string;
   title: string;
@@ -116,7 +116,7 @@ function SectionHeader({ title, action, onAction }: { title: string; action?: st
 }
 
 export default function HomeScreen() {
-  const [activeTab, setActiveTab] = useState<Tab>("overview");
+  const [activeTab, setActiveTab] = useState<Tab>("plan");
   const [viewMode, setViewMode] = useState<"personal" | "group">("personal");
   const [bookings, setBookings] = useState<Booking[]>(initialBookings);
   const [paid, setPaid] = useState(false);
@@ -126,6 +126,8 @@ export default function HomeScreen() {
   const [newAmount, setNewAmount] = useState("");
   const [newCategory, setNewCategory] = useState("Other");
   const [newParticipants, setNewParticipants] = useState<string[]>(["Aisha", "Rohan"]);
+  const [draftOptIns, setDraftOptIns] = useState({ rafting: true, spiceMarket: true, waterfall: false });
+  const [poolSettled, setPoolSettled] = useState(true);
 
   const total = useMemo(() => bookings.reduce((sum, booking) => sum + booking.amount, 0), [bookings]);
   const yourShare = useMemo(
@@ -168,6 +170,43 @@ export default function HomeScreen() {
 
   function showReceiptNote() {
     Alert.alert("Receipt capture", "Prototype action ready: connect camera or upload a receipt to extract vendor, date and amount. AI only reads the receipt — the ledger math stays deterministic.");
+  }
+
+  function renderPlan() {
+    const projected = 18400 - (draftOptIns.rafting ? 0 : 490);
+    const raftingDelta = draftOptIns.rafting ? "Rohan opted into rafting — your projected share dropped ₹490." : "Rafting is off your plan — opt in to see the shared-cost impact.";
+    const budgetRows = [
+      ["Travel", 6000, 6000, "on track"],
+      ["Stay", 7000, 6000, "on track"],
+      ["Food", 0, 0, "unallocated"],
+      ["Activities", 3000, draftOptIns.rafting ? 2450 : 0, draftOptIns.rafting ? "on track" : "unallocated"],
+      ["Shopping", 0, 0, "unallocated"],
+      ["Misc", 0, 0, "unallocated"],
+    ] as const;
+    const drafts = [
+      { id: "rafting", title: "White-water rafting", subtitle: "Dandeli Adventures · 13 Sep · draft", amount: 8000, share: 2667, active: draftOptIns.rafting, icon: "kayaking" as keyof typeof MaterialIcons.glyphMap },
+      { id: "spiceMarket", title: "Spice market walk", subtitle: "Proposed by Aisha · 14 Sep · draft", amount: 2400, share: 480, active: draftOptIns.spiceMarket, icon: "storefront" as keyof typeof MaterialIcons.glyphMap },
+      { id: "waterfall", title: "Waterfall detour", subtitle: "Proposed by Rohan · 14 Sep · draft", amount: 3600, share: 720, active: draftOptIns.waterfall, icon: "water" as keyof typeof MaterialIcons.glyphMap },
+    ];
+    const toggleDraft = (id: string) => setDraftOptIns((current) => ({ ...current, [id]: !current[id as keyof typeof current] }));
+    return (
+      <>
+        <View style={styles.planHero}>
+          <View style={styles.planHeroTop}><View><Text style={styles.eyebrowLight}>PLANNING PHASE · BEFORE FUNDING</Text><Text style={styles.planHeroTitle}>Build the trip together.</Text><Text style={styles.planHeroSubtitle}>Draft the itinerary, opt in, then fund only what the group is actually planning.</Text></View><View style={styles.planHeroIcon}><Icon name="route" size={25} color="#FFFFFF" /></View></View>
+          <View style={styles.planForecast}><Text style={styles.planForecastLabel}>YOUR PROJECTED COST</Text><Text style={styles.planForecastAmount}>{money(projected)}</Text><Text style={styles.planForecastFoot}>Before anything is booked or funded</Text></View>
+        </View>
+        <SectionHeader title="Your trip budget" action="Edit budget" onAction={() => Alert.alert("Budget setup", "Budget editing is ready: set your own total and allocate it across Travel, Stay, Food, Activities, Shopping, and Misc.")} />
+        <View style={styles.budgetSummary}><View><Text style={styles.budgetSummaryLabel}>TOTAL BUDGET</Text><Text style={styles.budgetSummaryValue}>{money(23500)}</Text></View><View style={styles.budgetRemaining}><Text style={styles.budgetRemainingLabel}>UNALLOCATED</Text><Text style={styles.budgetRemainingValue}>{money(7500)}</Text></View></View>
+        <View style={styles.budgetList}>{budgetRows.map(([category, budget, forecast, status]) => <View key={category} style={styles.budgetRow}><View style={styles.budgetCategory}><Text style={styles.budgetCategoryName}>{category}</Text><Text style={styles.budgetCategoryMeta}>{forecast ? `${money(forecast)} forecast` : "No draft allocation yet"}</Text></View><Text style={styles.budgetAmount}>{money(budget)}</Text><Text style={[styles.budgetStatus, status === "unallocated" && styles.budgetStatusMuted]}>{status}</Text></View>)}</View>
+        <SectionHeader title="Draft itinerary · opt-in" action="Add draft" onAction={() => Alert.alert("Draft activity", "Organisers can add proposed bookings here. Drafts are not confirmed and do not draw from the trip pool.")} />
+        <View style={styles.draftNotice}><Icon name="edit-calendar" size={18} color={colors.peachText} /><Text style={styles.draftNoticeText}>Drafts are proposals only — no booking is confirmed and no funds move until the group agrees.</Text></View>
+        {drafts.map((draft) => <View key={draft.id} style={styles.draftRow}><View style={[styles.draftIcon, { backgroundColor: draft.active ? colors.blueSoft : colors.bg }]}><Icon name={draft.icon} size={20} color={draft.active ? colors.blue : colors.faint} /></View><View style={styles.draftContent}><View style={styles.draftTitleRow}><Text style={styles.draftTitle}>{draft.title}</Text><View style={styles.draftPill}><Text style={styles.draftPillText}>DRAFT</Text></View></View><Text style={styles.draftSubtitle}>{draft.subtitle}</Text><Text style={styles.draftShare}>{draft.active ? `${money(draft.share)} projected share` : "Not opted in"}</Text></View><Switch value={draft.active} onValueChange={() => toggleDraft(draft.id)} trackColor={{ false: colors.line, true: "#B8C9F4" }} thumbColor={draft.active ? colors.blue : "#FFFFFF"} /></View>)}
+        <View style={styles.deltaCard}><View style={styles.deltaIcon}><Icon name="trending-down" size={17} color={colors.mintText} /></View><View style={{ flex: 1 }}><Text style={styles.deltaTitle}>Live forecast update</Text><Text style={styles.deltaText}>{raftingDelta}</Text></View></View>
+        <SectionHeader title="Forecast vs. budget" />
+        <View style={styles.forecastCard}><View style={styles.forecastRow}><Avatar name="Aisha" small /><View style={{ flex: 1 }}><Text style={styles.forecastName}>Aisha · you</Text><Text style={styles.forecastMeta}>Forecast {money(projected)} of {money(23500)}</Text></View><Text style={styles.onTrack}>ON TRACK</Text></View><View style={styles.forecastBar}><View style={[styles.forecastFill, { width: `${Math.min(100, (projected / 23500) * 100)}%` }]} /></View><View style={styles.forecastRow}><Avatar name="Rohan" small /><View style={{ flex: 1 }}><Text style={styles.forecastName}>Rohan</Text><Text style={styles.forecastMeta}>Forecast ₹19,200 of ₹18,000</Text></View><Text style={styles.overBudget}>OVER BY ₹1,200</Text></View><View style={styles.forecastBar}><View style={[styles.forecastFill, styles.forecastOver, { width: "100%" }]} /></View></View>
+        <View style={styles.poolContributionCard}><View style={styles.poolContributionIcon}><Icon name="account-balance" size={18} color={colors.blue} /></View><View style={{ flex: 1 }}><Text style={styles.poolContributionTitle}>Required pool contribution</Text><Text style={styles.poolContributionText}>Fund {money(projected)} when the group confirms. The amount follows the forecast, not a guess.</Text></View><Icon name="arrow-forward" size={17} color={colors.blue} /></View>
+      </>
+    );
   }
 
   function renderOverview() {
@@ -223,10 +262,10 @@ export default function HomeScreen() {
             <Text style={styles.quickLabel}>Scan receipt</Text>
             <Text style={styles.quickSub}>AI extracts details</Text>
           </Pressable>
-          <Pressable onPress={() => Alert.alert("Invite members", "Share this trip with your group using a deep link.")} style={({ pressed }) => [styles.quickAction, pressed && styles.pressed]}>
+          <Pressable onPress={() => Alert.alert("Invite members", "Share this trip with your group using a deep link. Group size is unlimited.")} style={({ pressed }) => [styles.quickAction, pressed && styles.pressed]}>
             <View style={[styles.quickIcon, { backgroundColor: colors.lavender }]}><Icon name="person-add-alt-1" size={20} color={colors.lavenderText} /></View>
             <Text style={styles.quickLabel}>Invite group</Text>
-            <Text style={styles.quickSub}>5 members max</Text>
+            <Text style={styles.quickSub}>Unlimited group size</Text>
           </Pressable>
         </View>
 
@@ -294,13 +333,14 @@ export default function HomeScreen() {
           <View style={styles.transferPerson}><Avatar name="Amit" /><View><Text style={styles.transferName}>Pay Amit</Text><Text style={styles.transferReason}>He fronted the hotel booking</Text></View></View>
           <Text style={styles.transferAmount}>{money(paid ? 0 : 1240)}</Text>
           <View style={styles.transferBreakdown}><Text style={styles.transferBreakdownText}>Hotel share · ₹750</Text><Text style={styles.transferBreakdownText}>Rafting share · ₹490</Text></View>
-          <Pressable onPress={() => { setPaid(true); Alert.alert("Settlement marked", "Amit will see this payment update in the trip ledger."); }} style={({ pressed }) => [styles.primaryButton, paid && styles.primaryButtonDone, pressed && styles.pressed]}>
-            <Icon name={paid ? "check" : "payments"} size={18} color="#FFFFFF" /><Text style={styles.primaryButtonText}>{paid ? "Marked as paid" : "Mark as paid"}</Text>
+          <View style={styles.poolSettledBanner}><View style={styles.poolSettledIcon}><Icon name="check-circle" size={18} color={colors.mintText} /></View><View style={{ flex: 1 }}><Text style={styles.poolSettledTitle}>Settled from trip pool</Text><Text style={styles.poolSettledText}>Confirmed today at 10:42 AM · no manual transfer needed</Text></View></View>
+          <Pressable onPress={() => { setPaid(true); Alert.alert("Outside-pool payment", "This cash payment has been recorded. The pool settlement remains the default path."); }} style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}>
+            <Icon name={paid ? "check" : "payments"} size={17} color={colors.muted} /><Text style={styles.secondaryButtonText}>{paid ? "Outside-pool payment recorded" : "I paid outside the pool"}</Text>
           </Pressable>
         </View>
         <View style={styles.optimizerCard}>
           <View style={styles.optimizerIcon}><Icon name="credit-card" size={18} color={colors.lavenderText} /></View>
-          <View style={{ flex: 1 }}><Text style={styles.optimizerTitle}>Card-aware optimiser</Text><Text style={styles.optimizerText}>The trip pool picks the best payer or card for discounts, then reimburses the member who paid directly.</Text></View>
+          <View style={{ flex: 1 }}><Text style={styles.optimizerTitle}>Card-aware optimiser</Text><Text style={styles.optimizerText}>Suggests which member should pay a booking based on their registered cards to capture the best available discount. That member is reimbursed from the trip pool, so the savings benefit everyone.</Text></View>
           <Switch value={true} onValueChange={() => {}} trackColor={{ false: colors.line, true: "#B8C9F4" }} thumbColor={colors.blue} />
         </View>
         <SectionHeader title="Trip close-out" />
@@ -335,7 +375,7 @@ export default function HomeScreen() {
         <SectionHeader title="Connected tools" />
         <View style={styles.settingCard}><SettingRow icon="credit-card" title="Payment partner" subtitle="Custody outside GroupTrip Ledger" tone={colors.mint} /><SettingRow icon="travel-explore" title="Travel APIs" subtitle="Deep-link bookings into your trip" tone={colors.blueSoft} /><SettingRow icon="notifications-none" title="Notifications" subtitle="Real-time group updates enabled" tone={colors.peach} /></View>
         <SectionHeader title="Prototype roadmap" />
-        <View style={styles.roadmapCard}><Text style={styles.roadmapIntro}>Thoughtful next steps, clearly labelled future.</Text><View style={styles.roadmapGrid}>{["Disputes", "Budget guardrails", "Multi-currency", "Vendor onboarding"].map((item) => <View key={item} style={styles.roadmapPill}><Text style={styles.roadmapPillText}>{item}</Text><Text style={styles.futureLabel}>FUTURE</Text></View>)}</View></View>
+        <View style={styles.roadmapCard}><Text style={styles.roadmapIntro}>In build now: disputes, budget guardrails, and multi-currency settlement.</Text><View style={styles.roadmapGrid}>{["Vendor onboarding", "Corporate approval workflows"].map((item) => <View key={item} style={styles.roadmapPill}><Text style={styles.roadmapPillText}>{item}</Text><Text style={styles.futureLabel}>NEXT</Text></View>)}</View></View>
         <Text style={styles.version}>GROUPTRIP LEDGER · PROTOTYPE 0.1</Text>
       </>
     );
@@ -345,13 +385,13 @@ export default function HomeScreen() {
     <ScreenContainer edges={["top", "left", "right", "bottom"]} containerClassName="bg-[#F5F8FC]">
       <StatusBar barStyle="dark-content" />
       <View style={styles.appShell}>
-        <View style={styles.topBar}><View><Text style={styles.greeting}>Good morning, Aisha</Text><Text style={styles.topSubtitle}>{activeTab === "overview" ? "Here’s what’s moving in your trip" : activeTab === "ledger" ? "Every booking, one source of truth" : activeTab === "settle" ? "Close the loop with fewer transfers" : activeTab === "activity" ? "Trace every change with confidence" : "Your account and trip controls"}</Text></View><Pressable onPress={() => setActiveTab("profile")} style={({ pressed }) => [styles.topAvatar, pressed && styles.pressed]}><Text style={styles.topAvatarText}>AK</Text></Pressable></View>
+        <View style={styles.topBar}><View><Text style={styles.greeting}>Good morning, Aisha</Text><Text style={styles.topSubtitle}>{activeTab === "plan" ? "Set the budget before the bookings" : activeTab === "overview" ? "Here’s what’s moving in your trip" : activeTab === "ledger" ? "Every booking, one source of truth" : activeTab === "settle" ? "Close the loop with fewer transfers" : activeTab === "activity" ? "Trace every change with confidence" : "Your account and trip controls"}</Text></View><Pressable onPress={() => setActiveTab("profile")} style={({ pressed }) => [styles.topAvatar, pressed && styles.pressed]}><Text style={styles.topAvatarText}>AK</Text></Pressable></View>
         <View style={styles.tripSwitcher}><View style={styles.tripSwitcherLeft}><View style={styles.tripDot}><Icon name="flight-takeoff" size={16} color="#FFFFFF" /></View><View><Text style={styles.tripSwitcherLabel}>CURRENT TRIP</Text><Text style={styles.tripSwitcherTitle}>Monsoon Escape</Text></View></View><Icon name="keyboard-arrow-down" size={20} color={colors.muted} /></View>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-          {activeTab === "overview" ? renderOverview() : activeTab === "ledger" ? renderLedger() : activeTab === "settle" ? renderSettle() : activeTab === "activity" ? renderActivity() : renderProfile()}
+          {activeTab === "plan" ? renderPlan() : activeTab === "overview" ? renderOverview() : activeTab === "ledger" ? renderLedger() : activeTab === "settle" ? renderSettle() : activeTab === "activity" ? renderActivity() : renderProfile()}
           <View style={{ height: 96 }} />
         </ScrollView>
-        <View style={styles.bottomNav}>{(["overview", "ledger", "settle", "activity", "profile"] as Tab[]).map((tab) => { const meta = { overview: ["home", "Home"], ledger: ["account-balance-wallet", "Ledger"], settle: ["payments", "Settle"], activity: ["timeline", "Activity"], profile: ["person-outline", "Profile"] }[tab] as [keyof typeof MaterialIcons.glyphMap, string]; return <Pressable key={tab} onPress={() => setActiveTab(tab)} style={({ pressed }) => [styles.navItem, pressed && styles.pressed]}><Icon name={meta[0]} size={22} color={activeTab === tab ? colors.blue : colors.faint} /><Text style={[styles.navLabel, activeTab === tab && styles.navLabelActive]}>{meta[1]}</Text>{activeTab === tab ? <View style={styles.navIndicator} /> : null}</Pressable>; })}</View>
+        <View style={styles.bottomNav}>{(["plan", "overview", "ledger", "settle", "activity", "profile"] as Tab[]).map((tab) => { const meta = { plan: ["route", "Plan"], overview: ["home", "Home"], ledger: ["account-balance-wallet", "Ledger"], settle: ["payments", "Settle"], activity: ["timeline", "Activity"], profile: ["person-outline", "Profile"] }[tab] as [keyof typeof MaterialIcons.glyphMap, string]; return <Pressable key={tab} onPress={() => setActiveTab(tab)} style={({ pressed }) => [styles.navItem, pressed && styles.pressed]}><Icon name={meta[0]} size={22} color={activeTab === tab ? colors.blue : colors.faint} /><Text style={[styles.navLabel, activeTab === tab && styles.navLabelActive]}>{meta[1]}</Text>{activeTab === tab ? <View style={styles.navIndicator} /> : null}</Pressable>; })}</View>
       </View>
 
       <Modal visible={addOpen} animationType="slide" transparent onRequestClose={() => setAddOpen(false)}>
@@ -524,6 +564,63 @@ const styles = StyleSheet.create({
   roadmapPillText: { color: colors.ink, fontSize: 10, fontWeight: "700" },
   futureLabel: { color: colors.faint, fontSize: 8, fontWeight: "800", letterSpacing: 0.8, marginTop: 5 },
   version: { color: colors.faint, fontSize: 9, textAlign: "center", letterSpacing: 1, marginTop: 28 },
+  planHero: { backgroundColor: colors.ink, borderRadius: 20, padding: 18, marginBottom: 22, shadowColor: colors.ink, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 15, elevation: 6 },
+  planHeroTop: { flexDirection: "row", justifyContent: "space-between", gap: 10 },
+  planHeroTitle: { color: "#FFFFFF", fontSize: 24, fontWeight: "800", letterSpacing: -0.6, marginTop: 8 },
+  planHeroSubtitle: { color: "#B6C6DA", fontSize: 11, lineHeight: 16, marginTop: 5, maxWidth: 280 },
+  planHeroIcon: { width: 45, height: 45, borderRadius: 14, backgroundColor: "#27456D", alignItems: "center", justifyContent: "center" },
+  planForecast: { borderTopWidth: 1, borderTopColor: "#2D4668", marginTop: 17, paddingTop: 15 },
+  planForecastLabel: { color: "#91A7C1", fontSize: 9, letterSpacing: 1, fontWeight: "800" },
+  planForecastAmount: { color: "#FFFFFF", fontSize: 29, fontWeight: "800", marginTop: 5 },
+  planForecastFoot: { color: "#B6C6DA", fontSize: 10, marginTop: 3 },
+  budgetSummary: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.line, borderRadius: 16, padding: 15, flexDirection: "row", justifyContent: "space-between", marginBottom: 9 },
+  budgetSummaryLabel: { color: colors.faint, fontSize: 9, fontWeight: "800", letterSpacing: 0.8 },
+  budgetSummaryValue: { color: colors.ink, fontSize: 21, fontWeight: "800", marginTop: 5 },
+  budgetRemaining: { backgroundColor: colors.blueSoft, borderRadius: 11, padding: 10, minWidth: 112 },
+  budgetRemainingLabel: { color: colors.blue, fontSize: 9, fontWeight: "800", letterSpacing: 0.8 },
+  budgetRemainingValue: { color: colors.ink, fontSize: 17, fontWeight: "800", marginTop: 4 },
+  budgetList: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.line, borderRadius: 16, paddingHorizontal: 14, marginBottom: 22 },
+  budgetRow: { flexDirection: "row", alignItems: "center", paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: colors.line, gap: 6 },
+  budgetCategory: { flex: 1 },
+  budgetCategoryName: { color: colors.ink, fontSize: 11, fontWeight: "800" },
+  budgetCategoryMeta: { color: colors.muted, fontSize: 9, marginTop: 3 },
+  budgetAmount: { color: colors.ink, fontSize: 10, fontWeight: "700", width: 55, textAlign: "right" },
+  budgetStatus: { color: colors.mintText, fontSize: 8, fontWeight: "800", width: 58, textAlign: "right" },
+  budgetStatusMuted: { color: colors.faint },
+  draftNotice: { backgroundColor: colors.peach, borderRadius: 13, padding: 12, flexDirection: "row", gap: 8, alignItems: "center", marginBottom: 10 },
+  draftNoticeText: { color: colors.muted, fontSize: 10, lineHeight: 14, flex: 1 },
+  draftRow: { backgroundColor: colors.card, borderRadius: 15, borderWidth: 1, borderColor: "#F0D8C3", borderStyle: "dashed", padding: 12, flexDirection: "row", alignItems: "center", marginBottom: 9 },
+  draftIcon: { width: 40, height: 40, borderRadius: 13, alignItems: "center", justifyContent: "center", marginRight: 10 },
+  draftContent: { flex: 1 },
+  draftTitleRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  draftTitle: { color: colors.ink, fontSize: 12, fontWeight: "800" },
+  draftPill: { backgroundColor: colors.peach, borderRadius: 5, paddingHorizontal: 5, paddingVertical: 3 },
+  draftPillText: { color: colors.peachText, fontSize: 7, fontWeight: "800", letterSpacing: 0.7 },
+  draftSubtitle: { color: colors.muted, fontSize: 9, marginTop: 4 },
+  draftShare: { color: colors.blue, fontSize: 9, fontWeight: "700", marginTop: 5 },
+  deltaCard: { backgroundColor: colors.mint, borderRadius: 14, padding: 13, flexDirection: "row", alignItems: "center", gap: 9, marginTop: 5, marginBottom: 22 },
+  deltaIcon: { width: 30, height: 30, borderRadius: 10, backgroundColor: "#D2F0E5", alignItems: "center", justifyContent: "center" },
+  deltaTitle: { color: colors.ink, fontSize: 11, fontWeight: "800" },
+  deltaText: { color: colors.muted, fontSize: 10, lineHeight: 14, marginTop: 3 },
+  forecastCard: { backgroundColor: colors.card, borderRadius: 16, borderWidth: 1, borderColor: colors.line, padding: 14, marginBottom: 12 },
+  forecastRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 7 },
+  forecastName: { color: colors.ink, fontSize: 11, fontWeight: "800" },
+  forecastMeta: { color: colors.muted, fontSize: 9, marginTop: 3 },
+  onTrack: { color: colors.mintText, fontSize: 8, fontWeight: "800" },
+  overBudget: { color: colors.red, fontSize: 8, fontWeight: "800" },
+  forecastBar: { height: 7, borderRadius: 4, backgroundColor: colors.bg, marginBottom: 13, overflow: "hidden" },
+  forecastFill: { height: 7, borderRadius: 4, backgroundColor: colors.blue },
+  forecastOver: { backgroundColor: colors.red },
+  poolContributionCard: { backgroundColor: colors.blueSoft, borderRadius: 15, padding: 14, flexDirection: "row", alignItems: "center", gap: 9, marginTop: 2 },
+  poolContributionIcon: { width: 31, height: 31, borderRadius: 10, backgroundColor: "#D5E6FF", alignItems: "center", justifyContent: "center" },
+  poolContributionTitle: { color: colors.ink, fontSize: 12, fontWeight: "800" },
+  poolContributionText: { color: colors.muted, fontSize: 10, lineHeight: 15, marginTop: 4 },
+  poolSettledBanner: { backgroundColor: colors.mint, borderRadius: 12, padding: 11, flexDirection: "row", alignItems: "center", gap: 8, marginTop: 14 },
+  poolSettledIcon: { width: 29, height: 29, borderRadius: 9, backgroundColor: "#D2F0E5", alignItems: "center", justifyContent: "center" },
+  poolSettledTitle: { color: colors.ink, fontSize: 11, fontWeight: "800" },
+  poolSettledText: { color: colors.muted, fontSize: 9, marginTop: 3 },
+  secondaryButton: { height: 40, borderRadius: 11, borderWidth: 1, borderColor: colors.line, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 7, marginTop: 9 },
+  secondaryButtonText: { color: colors.muted, fontSize: 10, fontWeight: "700" },
   bottomNav: { position: "absolute", left: 0, right: 0, bottom: 0, height: 73, backgroundColor: "rgba(255,255,255,0.98)", borderTopWidth: 1, borderTopColor: colors.line, flexDirection: "row", paddingHorizontal: 8, paddingTop: 9 },
   navItem: { flex: 1, alignItems: "center", position: "relative", gap: 4 },
   navLabel: { color: colors.faint, fontSize: 9, fontWeight: "700" },
