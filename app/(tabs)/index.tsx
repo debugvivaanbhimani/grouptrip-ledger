@@ -374,7 +374,7 @@ function SettingRow({ icon, title, subtitle, tone }: { icon: keyof typeof Materi
 }
 
 const styles = StyleSheet.create({
-  appShell: { flex: 1, backgroundColor: colors.bg },
+  appShell: { flex: 1, width: "100%", maxWidth: 430, alignSelf: "center", backgroundColor: colors.bg },
   topBar: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 14, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   greeting: { color: colors.ink, fontSize: 22, fontWeight: "800", letterSpacing: -0.5 },
   topSubtitle: { color: colors.muted, fontSize: 12, marginTop: 4 },
